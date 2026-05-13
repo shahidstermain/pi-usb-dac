@@ -1,73 +1,114 @@
-# pi-usb-dac
+<h1 align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:22c55e,100:14b8a6&height=180&section=header&text=Raspberry%20Pi%20USB%20DAC&fontSize=48&animation=fadeIn&fontAlignY=35" width="100%" />
+</h1>
 
-Bootstrap for turning a **Raspberry Pi Zero W + Raspberry Pi DAC Pro** into a USB Audio Class gadget for the Mac mini. Implements the plan at `~/.windsurf/plans/pi-zero-w-usb-dac-*.md`.
+<p align="center">
+  <img src="https://img.shields.io/badge/Raspberry%20Pi-000000?style=flat-square&logo=raspberry-pi" />
+  <img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux" />
+  <img src="https://img.shields.io/badge/Shell-4EAA25?style=flat-square&logo=gnu-bash" />
+  <img src="https://img.shields.io/badge/Audio-FF6B6B?style=flat-square" />
+</p>
 
-## What `setup.sh` does
+<p align="center">
+  <strong>Turn a Raspberry Pi Zero W + DAC Pro into a USB Audio Class gadget for your Mac mini</strong>
+</p>
 
-Idempotent, reboots once at the end.
+---
 
-1. `apt install alsa-utils` (provides `alsaloop`, `aplay`, `arecord`).
-2. Edits `/boot/firmware/config.txt`:
-   - disables onboard audio (`dtparam=audio=off`)
-   - loads the DAC Pro overlay (`dtoverlay=iqaudio-dacplus`)
-   - enables the USB OTG controller (`dtoverlay=dwc2`)
-3. Appends `modules-load=dwc2` to `/boot/firmware/cmdline.txt` (single-line safe).
-4. Autoloads `g_audio` on boot with UAC2 at **48 kHz / 16-bit / stereo**.
-5. Installs `usb-dac.service` — an `alsaloop` bridge from `hw:UAC2Gadget` (capture from Mac) to `hw:IQaudIODAC` (I²S playback to DAC Pro).
-6. Reboots.
+## 🎯 What This Does
 
-All edited files get a `.bak.<timestamp>` copy next to the original.
+Transform your **Raspberry Pi Zero W + IQAudio DAC Pro** into a high-fidelity USB audio device (UAC2) that your Mac recognizes natively. Get pristine audio passthrough from Mac → Pi → external speakers or amplifier.
 
-## Usage
+```
+Mac (USB-A) ──▶ Pi Zero W + DAC Pro ──▶ Speakers/AMP
+```
 
-From the Mac, with the Pi reachable over WiFi (hostname `pidac.local` per the plan):
+---
+
+## ⚡ Features
+
+| Feature | Description |
+|---------|-------------|
+| 🔌 **USB Audio Class 2** | 48kHz / 16-bit stereo out of the box |
+| 🎚️ **ALSA Loopback** | Real-time audio bridging via `alsaloop` |
+| 🔄 **Idempotent** | Run `setup.sh` multiple times safely |
+| 💾 **Auto-Backups** | Every config edit creates timestamped backups |
+| 🔧 **Tunable** | Adjust latency, bit-depth, sample rate |
+| 🚀 **Systemd Service** | Auto-starts on Pi boot |
+
+---
+
+## 🚀 Quick Start
 
 ```bash
+# 1. Copy setup script to Pi
 scp pi-usb-dac/setup.sh shahid@pidac.local:/tmp/
+
+# 2. Run the bootstrapper (requires sudo)
 ssh shahid@pidac.local 'sudo bash /tmp/setup.sh'
-# Pi reboots. Wait ~30s, then physically move the Pi's middle micro-USB to the Mac.
+
+# 3. Wait ~30 seconds for reboot, then:
+#    - Plug Pi's middle micro-USB into Mac's USB-A port
+#    - Select "UAC2Gadget" in Mac's Sound Settings
 ```
 
-## Verify
+---
 
-On the Pi (after reboot + USB plugged into Mac's USB-A):
+## 🔧 Tuning
 
+Edit `/etc/systemd/system/usb-dac.service` on the Pi:
+
+| Issue | Fix |
+|-------|-----|
+| Clicks/pops | Increase `--latency` to `40000` |
+| Too much latency | Drop to `10000` if stable |
+| Want 24-bit | Change `p_ssize=2` → `p_ssize=3` |
+
+Then: `sudo systemctl daemon-reload && sudo systemctl restart usb-dac`
+
+---
+
+## 📊 Verify It Works
+
+**On the Pi:**
 ```bash
-aplay  -l                       # card: IQaudIODAC, device 0
-arecord -l                      # card: UAC2Gadget (only when Mac-connected)
+aplay -l        # Should show: card 0: IQaudIODAC
+arecord -l      # Should show: card 0: UAC2Gadget
 systemctl status usb-dac.service
-journalctl -u usb-dac.service -n 50 --no-pager
 ```
 
-On the Mac:
+**On the Mac:**
+- **System Settings → Sound → Output** → Select USB audio device
+- **Audio MIDI Setup** → Set to **16-bit, 48000 Hz, 2ch**
 
-- **System Settings → Sound → Output** — pick the new USB audio device.
-- **Audio MIDI Setup** — set it to **16-bit, 48000 Hz, 2ch** (must match `g_audio` opts or you get resampling + glitches).
+---
 
-## Tuning
+## ⚠️ Important Notes
 
-Edit `/etc/systemd/system/usb-dac.service` on the Pi, then `sudo systemctl daemon-reload && sudo systemctl restart usb-dac`.
+- **Middle micro-USB** on Pi Zero W = data/OTG port (required)
+- **Outer micro-USB** = power only (won't enumerate as gadget)
+- If Mac's 500mA browns out Pi + DAC → use powered hub or Y-cable
+- **Don't use 192kHz** on Zero W (single-core ARM11 can't keep up)
 
-- **Clicks/pops** → raise `--latency` to `40000`.
-- **Latency too high** → drop to `10000` if stable.
-- **24-bit** → change `p_ssize=2` to `p_ssize=3` in `/etc/modprobe.d/g_audio.conf` *and* `--format=S16_LE` to `--format=S24_LE` in the service file. Reboot.
+---
 
-## Rollback
+## 🔙 Rollback
 
 ```bash
 ls /boot/firmware/*.bak.*
-# restore the backup you want, e.g.:
+# Restore desired backup:
 sudo cp /boot/firmware/config.txt.bak.20250101T000000Z /boot/firmware/config.txt
 sudo cp /boot/firmware/cmdline.txt.bak.20250101T000000Z /boot/firmware/cmdline.txt
 sudo systemctl disable --now usb-dac.service
-sudo rm /etc/systemd/system/usb-dac.service \
-        /etc/modules-load.d/usb-audio.conf \
-        /etc/modprobe.d/g_audio.conf
 sudo reboot
 ```
 
-## Notes
+---
 
-- Middle micro-USB on the Pi Zero W is the data/OTG port. Outer `PWR` port is power-only; the gadget will not enumerate from it.
-- If the Mac's 500 mA USB-A browns out the Pi + DAC Pro, use a powered USB hub or a Y-cable (data → Mac, power → 5 V PSU).
-- Don't try 192 kHz on a Zero W — single-core ARM11 can't keep up. Use a Zero 2 W if you need it.
+<p align="center">
+  <img src="https://komarev.com/ghpvc/?repo=pi-usb-dac&label=Clones&color=22c55e&style=flat" />
+</p>
+
+<div align="center">
+  Built with 🔊 for audiophiles who repurpose hardware
+</div>
