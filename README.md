@@ -20,8 +20,27 @@
 Transform your **Raspberry Pi Zero W + IQAudio DAC Pro** into a high-fidelity USB audio device (UAC2) that your Mac recognizes natively. Get pristine audio passthrough from Mac → Pi → external speakers or amplifier.
 
 ```
-Mac (USB-A) ──▶ Pi Zero W + DAC Pro ──▶ Speakers/AMP
+┌─────────────┐    USB-A OTG     ┌─────────────┐    3.5mm/I²S    ┌─────────────┐
+│   Mac mini  │ ───────────────▶ │  Pi Zero W  │ ──────────────▶ │  DAC Pro    │
+│  (Source)   │    (Data Port)    │ + g_audio   │                 │ (Output)    │
+└─────────────┘                  └─────────────┘                 └─────────────┘
+                                                                    │
+                                                                    ▼
+                                                            ┌─────────────┐
+                                                            │  Speakers   │
+                                                            │     or     │
+                                                            │   AMP      │
+                                                            └─────────────┘
 ```
+
+## 🎧 Why This Project?
+
+| Problem | Solution |
+|---------|----------|
+| Mac mini has no optical/audio out | Create a USB audio device the Mac sees natively |
+| Want better DAC than Mac's headphone jack | Route through any USB DAC you own |
+| Audiophile-grade volume control | Use your existing amplifier's volume knob |
+| Budget solution < $50 | Pi Zero W + DAC Pro ≈ $40 |
 
 ---
 
@@ -83,12 +102,41 @@ systemctl status usb-dac.service
 
 ---
 
-## ⚠️ Important Notes
+## 🛠️ Hardware Requirements
+
+| Component | What You Need | Approx Cost |
+|-----------|---------------|-------------|
+| **Pi Zero W** | Single-core ARM11, WiFi built-in | $15 |
+| **IQAudio DAC Pro** | HAT-style DAC, 192kHz/32-bit | $25 |
+| **MicroSD Card** | 8GB+ for OS | $5 |
+| **Power Supply** | 5V 2A micro-USB | $5 |
+| **Micro-USB Cable** | For data (not power-only) | $3 |
+
+### ⚠️ Important Notes
 
 - **Middle micro-USB** on Pi Zero W = data/OTG port (required)
 - **Outer micro-USB** = power only (won't enumerate as gadget)
 - If Mac's 500mA browns out Pi + DAC → use powered hub or Y-cable
 - **Don't use 192kHz** on Zero W (single-core ARM11 can't keep up)
+
+---
+
+## 🔧 Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Pi doesn't appear as USB device | Using power-only micro-USB port | Use the **middle** micro-USB port |
+| No audio output | DAC not detected | Run `aplay -l` to verify card 0 exists |
+| Crackling/popping | Buffer underrun | Increase latency in systemd service |
+| Mac doesn't see device | Driver issue | Check System Report → USB for "UAC2Gadget" |
+| WiFi drops after gadget enable | USB bandwidth conflict | Use Ethernet or accept limited WiFi performance |
+
+```bash
+# Diagnostic commands
+lsusb                              # Look for "Linux Foundation" audio device
+dmesg | grep -i audio              # Kernel audio module messages
+systemctl status usb-dac.service   # Service health check
+```
 
 ---
 
@@ -108,6 +156,13 @@ sudo reboot
 <p align="center">
   <img src="https://komarev.com/ghpvc/?repo=pi-usb-dac&label=Clones&color=22c55e&style=flat" />
 </p>
+
+---
+## 📈 Stats
+
+![GitHub stars](https://img.shields.io/github/stars/shahidstermain/pi-usb-dac?style=flat&color=22c55e)
+![GitHub forks](https://img.shields.io/github/forks/shahidstermain/pi-usb-dac?style=flat&color=14b8a6)
+![Last updated](https://img.shields.io/github/last-commit/shahidstermain/pi-usb-dac?style=flat&color=22c55e)
 
 <div align="center">
   Built with 🔊 for audiophiles who repurpose hardware
